@@ -65,7 +65,7 @@ class ReplayBuffer:
         """Return tensors ready for training (on `output_device`)."""
         max_mem = min(self.mem_ctr, self.mem_size)
         batch   = torch.randint(0, max_mem, (batch_size,),
-                                device=self.input_device, dtype=torch.float32)
+                                device=self.input_device, dtype=torch.int64)
 
         # Cast / move once, right here
         states      = self.state_memory[batch]     \
@@ -77,5 +77,12 @@ class ReplayBuffer:
 
         # **Return actions as 1-D (B,) LongTensor — caller will unsqueeze**
         actions     = self.action_memory[batch].to(self.output_device)
+        print("Replay buffer sample called")
+
+        # Ensure proper shapes
+        if states.dim() == 1:
+            states = states.unsqueeze(0)
+        if actions.dim() == 1:
+            actions = actions.unsqueeze(0)
 
         return states, actions, rewards, next_states, dones

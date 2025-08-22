@@ -12,8 +12,6 @@ Average predictions across ensemble
 Select best sequence, execute first action
 Store transition, retrain models every 10 steps
 
-
-
 Key Implementation Details
 
 Uncertainty: Use ensemble disagreement (std dev) for exploration
