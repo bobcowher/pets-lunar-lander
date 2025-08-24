@@ -18,8 +18,6 @@ class ReplayBuffer:
         else:
             self.input_device  = input_device
         
-        print(f"Replay buffer memory on: {self.input_device}")
-
         self.output_device = output_device
 
         # States (uint8 saves ~4× RAM vs float32)
@@ -77,7 +75,6 @@ class ReplayBuffer:
 
         # **Return actions as 1-D (B,) LongTensor — caller will unsqueeze**
         actions     = self.action_memory[batch].to(self.output_device)
-        print("Replay buffer sample called")
 
         # Ensure proper shapes
         if states.dim() == 1:
