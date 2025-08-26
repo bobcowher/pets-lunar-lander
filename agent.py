@@ -17,8 +17,8 @@ class Agent:
 
     def __init__(self, env : gym.Env, model_count=5):
         self.max_memory_size = 10000
-        self.episodes = 1000
-        self.batch_size = 256 
+        self.episodes = 3000
+        self.batch_size = 512 
 
         self.env = env
 
