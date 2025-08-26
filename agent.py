@@ -32,7 +32,7 @@ class Agent:
                               input_device=self.device,
                               output_device=self.device)
 
-        self.model = EnsembleModel(obs_shape=obs.shape[0], action_shape=action.shape[0])
+        self.model = EnsembleModel(obs_shape=obs.shape[0], action_shape=action.shape[0], device=self.device)
 
 
     def select_action(self, current_state):
