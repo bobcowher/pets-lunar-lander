@@ -71,7 +71,7 @@ class Agent:
             episode_reward = episode_reward + reward
             self.env.render()
 
-            if(done):
+            if(done or truncated):
                 break
 
         print(f"Test Episode finished. Reward: {episode_reward}")
@@ -102,7 +102,7 @@ class Agent:
                 episode_reward = episode_reward + reward
                 # self.env.render()
   
-                if(done):
+                if(done or truncated):
                     break
 
                 if(self.memory.can_sample(batch_size=self.batch_size)):
@@ -129,6 +129,6 @@ class Agent:
 
             self.model.save_the_model('latest.pt')
             
-            writer.add_scalar("Score/Episode Reward", episode_reward, total_steps)
+            writer.add_scalar("Score/Episode Reward", episode_reward, episode)
             print(f"Episode {episode} finished. Reward: {episode_reward}")
 
