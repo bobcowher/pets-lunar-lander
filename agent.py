@@ -1,18 +1,20 @@
 import gymnasium as gym
+import sys
 import time
 import torch
 from torch._C import device
 from torch._prims_common import device_or_default, dtype_or_default
 from torch.nn.functional import mse_loss
+from torch.optim import optimizer
 from buffer import ReplayBuffer
-from model import DynamicsModel 
+from model import DynamicsModel, EnsembleModel 
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 
 
 class Agent:
 
-    def __init__(self, env : gym.Env):
+    def __init__(self, env : gym.Env, model_count=5):
         self.max_memory_size = 10000
         self.episodes = 1000
         self.batch_size = 256 
@@ -30,35 +32,36 @@ class Agent:
                               input_device=self.device,
                               output_device=self.device)
 
-        self.dynamics_model = DynamicsModel(obs_shape=obs.shape[0], action_shape=action.shape[0]).to(self.device)
-        self.optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=0.0001)
+        self.model = EnsembleModel(obs_shape=obs.shape[0], action_shape=action.shape[0])
+
+
+    def select_action(self, current_state):
+        action = self.plan_action(current_state)
+        print(action)
+        sys.exit(1)
+        return action
 
 
     def plan_action(self, current_state, horizon=10, num_samples=100):
-        # Sample 1000 different 15-step action sequences
         current_state = torch.tensor(current_state, dtype=torch.float32).to(self.device)
 
-        action_sequences = torch.rand(num_samples, horizon, 2).to(self.device)  # [1000, 15, 2]
-        action_sequences = action_sequences * 2 - 1  # Scale to [-1, 1]
-    
-        predicted_returns = []    
-
-        for seq in action_sequences:
-            total_return = 0
-            state = current_state.clone()
-
-            for t in range(horizon):
-                action = seq[t]
-
-                delta_state, reward = self.dynamics_model(state.unsqueeze(0), action.unsqueeze(0))
-                state = state + delta_state.squeeze(0)
-                total_return += reward.item()
-
-            predicted_returns.append(total_return)
-
-        best_idx = torch.argmax(torch.tensor(predicted_returns))
-        best_sequence = action_sequences[best_idx]
-        return best_sequence[0].cpu().numpy()
+        action_sequences = torch.rand(num_samples, horizon, 2).to(self.device) * 2 - 1
+        
+        # Vectorized rollouts
+        states = current_state.unsqueeze(0).expand(num_samples, -1)  # [num_samples, state_dim]
+        total_returns = torch.zeros(num_samples, device=self.device)
+        
+        for t in range(horizon):
+            actions = action_sequences[:, t, :]  # [num_samples, action_dim]
+            
+            # Batch forward pass
+            predictions = self.model.predict(states, actions)  # [num_models, batch, output_dim]
+            delta_states, rewards = predictions.mean(0)  # Average across ensemble models
+            states = states + delta_states
+            total_returns += rewards.squeeze(-1)
+        
+        best_idx = torch.argmax(total_returns)
+        return action_sequences[best_idx, 0].cpu().numpy()
 
 
     def test(self):
@@ -69,7 +72,7 @@ class Agent:
         self.dynamics_model.load_the_model()
 
         while not done:
-            action = self.plan_action(current_state=obs)
+            action = self.select_action(current_state=obs)
 
             obs, reward, done, truncated, info = self.env.step(action)
             episode_reward = episode_reward + reward
@@ -116,10 +119,10 @@ class Agent:
                     rewards = rewards.unsqueeze(1)
                     dones = dones.unsqueeze(1).float()
 
-                    predicted_obs_diffs, predicated_rewards = self.dynamics_model(states, actions)
+                    predicted_obs_diffs, predicated_rewards = self.model.predict(states, actions)
 
-                    loss = mse_loss(next_states - states, predicted_obs_diffs) + mse_loss(rewards, predicated_rewards)
-                    
+                    loss = self.model.train_step()
+
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
@@ -130,9 +133,9 @@ class Agent:
 
             if(episode_reward > best_score):
                 best_score = episode_reward
-                self.dynamics_model.save_the_model('best.pt')
+                self.model.save_the_model('best.pt')
 
-            self.dynamics_model.save_the_model('latest.pt')
+            self.model.save_the_model('latest.pt')
             
             writer.add_scalar("Score/Episode Reward", episode_reward, total_steps)
             print(f"Episode {episode} finished. Reward: {episode_reward}")
