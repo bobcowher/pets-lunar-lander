@@ -1,3 +1,4 @@
+from os import stat
 import gymnasium as gym
 import sys
 import time
@@ -35,13 +36,6 @@ class Agent:
         self.model = EnsembleModel(obs_shape=obs.shape[0], action_shape=action.shape[0], device=self.device)
 
 
-    def select_action(self, current_state):
-        action = self.plan_action(current_state)
-        print(action)
-        sys.exit(1)
-        return action
-
-
     def plan_action(self, current_state, horizon=10, num_samples=100):
         current_state = torch.tensor(current_state, dtype=torch.float32).to(self.device)
 
@@ -55,8 +49,7 @@ class Agent:
             actions = action_sequences[:, t, :]  # [num_samples, action_dim]
             
             # Batch forward pass
-            predictions = self.model.predict(states, actions)  # [num_models, batch, output_dim]
-            delta_states, rewards = predictions.mean(0)  # Average across ensemble models
+            delta_states, rewards = self.model.predict(states, actions) 
             states = states + delta_states
             total_returns += rewards.squeeze(-1)
         
@@ -69,10 +62,10 @@ class Agent:
         episode_reward = 0
         obs, info = self.env.reset()
 
-        self.dynamics_model.load_the_model()
+        self.model.load_the_model()
 
         while not done:
-            action = self.select_action(current_state=obs)
+            action = self.plan_action(current_state=obs)
 
             obs, reward, done, truncated, info = self.env.step(action)
             episode_reward = episode_reward + reward
@@ -119,15 +112,14 @@ class Agent:
                     rewards = rewards.unsqueeze(1)
                     dones = dones.unsqueeze(1).float()
 
-                    predicted_obs_diffs, predicated_rewards = self.model.predict(states, actions)
+#                    predicted_obs_diffs, predicated_rewards = self.model.predict(states, actions)
 
-                    loss = self.model.train_step()
+                    loss = self.model.train_step(states=states,
+                                                 next_states=next_states,
+                                                 actions=actions,
+                                                 rewards=rewards)
 
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
-
-                    writer.add_scalar("Loss/model", loss.item(), total_steps)
+                    writer.add_scalar("Loss/model", loss, total_steps)
 
                     total_steps += 1
 

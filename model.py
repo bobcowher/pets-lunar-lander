@@ -32,17 +32,22 @@ class EnsembleModel:
         self.optimizers = [torch.optim.Adam(m.parameters()) for m in self.models]
         self.model_save_dir = 'models'
     
-    def train_step(self, states, actions, targets):
+    def train_step(self, states, actions, next_states, rewards):
         total_loss = 0
         for i, (model, optimizer) in enumerate(zip(self.models, self.optimizers)):
             # Bootstrap sampling - different batch per model
             indices = torch.randint(0, len(states), (len(states),))
             batch_states = states[indices]
+            batch_next_states = next_states[indices]
             batch_actions = actions[indices]
-            batch_targets = targets[indices]
+            batch_rewards = rewards[indices]
+
+            obs_diffs = batch_next_states - batch_states
             
-            predictions = model(batch_states, batch_actions)
-            loss = F.mse_loss(predictions, batch_targets)
+            predicted_obs_diffs, predicted_rewards = model(batch_states, batch_actions)
+
+            loss = F.mse_loss(torch.cat([predicted_obs_diffs, predicted_rewards], dim=-1), 
+                              torch.cat([obs_diffs, batch_rewards], dim=-1))
             
             optimizer.zero_grad()
             loss.backward()
