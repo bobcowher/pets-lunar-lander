@@ -49,10 +49,19 @@ class Agent:
             actions = action_sequences[:, t, :]  # [num_samples, action_dim]
             
             # Batch forward pass
-            delta_states, rewards = self.model.predict(states, actions) 
+            delta_states, rewards, delta_uncertainty, reward_uncertainty = self.model.predict(states, actions) 
             states = states + delta_states
+                
+            uncertainty_penalty = delta_uncertainty.sum(-1) + reward_uncertainty.squeeze(-1)
+
             total_returns += rewards.squeeze(-1)
-        
+            total_returns -= uncertainty_penalty
+
+            
+        #     print(f"Total Returns: {total_returns}")
+        #     print(f"Rewards: {rewards.squeeze(-1)}")
+        #     print(f"Delta Uncertainty: {delta_uncertainty.sum(-1)}")
+        # 
         best_idx = torch.argmax(total_returns)
         return action_sequences[best_idx, 0].cpu().numpy()
 

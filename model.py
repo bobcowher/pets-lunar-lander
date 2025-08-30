@@ -56,7 +56,7 @@ class EnsembleModel:
         
         return total_loss / len(self.models)
     
-    def predict(self, states, actions):
+    def predict(self, states, actions, return_uncertainty=False):
         with torch.no_grad():
             obs_diffs = []
             rewards = []
@@ -66,9 +66,16 @@ class EnsembleModel:
                 rewards.append(reward)
             
             # Return averaged predictions
-            avg_obs_diff = torch.stack(obs_diffs).mean(0)
-            avg_reward = torch.stack(rewards).mean(0)
-            return avg_obs_diff, avg_reward
+            obs_diffs = torch.stack(obs_diffs)
+            rewards = torch.stack(rewards)
+            
+            obs_uncertainty = obs_diffs.var(0)
+            reward_uncertainty = rewards.var(0)
+
+            avg_obs_diff = obs_diffs.mean(0)
+            avg_reward = rewards.mean(0)
+
+            return avg_obs_diff, avg_reward, obs_uncertainty, reward_uncertainty
     
     def save_the_model(self, filename='latest'):
         os.makedirs(self.model_save_dir, exist_ok=True) 
