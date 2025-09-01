@@ -27,9 +27,9 @@ class DynamicsModel(nn.Module):
 
 
 class EnsembleModel:
-    def __init__(self, num_models=5, hidden_dim=256, obs_shape=None, action_shape=None, device=None):
+    def __init__(self, num_models=5, hidden_dim=256, obs_shape=None, action_shape=None, device=None, learning_rate=0.0001):
         self.models = [DynamicsModel(hidden_dim=hidden_dim, obs_shape=obs_shape, action_shape=action_shape).to(device) for _ in range(num_models)]
-        self.optimizers = [torch.optim.Adam(m.parameters()) for m in self.models]
+        self.optimizers = [torch.optim.Adam(m.parameters(), lr=learning_rate) for m in self.models]
         self.model_save_dir = 'models'
     
     def train_step(self, states, actions, next_states, rewards):

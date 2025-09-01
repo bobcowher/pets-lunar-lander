@@ -9,8 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 from agent import Agent
 
-max_memory_size = 100000
-episodes = 500
+max_memory_size = 10000
+episodes = 50  # Debug: 50 episodes to see planning
 dynamics_model_batch_size = 256 
 
 env = gym.make("LunarLander-v3", continuous=True, gravity=-10.0,
@@ -19,6 +19,8 @@ env = gym.make("LunarLander-v3", continuous=True, gravity=-10.0,
 
 agent = Agent(env=env)
 
-agent.train(episodes=episodes)
-        
+# Override episodes for debug
+agent.episodes = 50
 
+agent.train()
+        

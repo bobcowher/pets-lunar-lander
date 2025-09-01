@@ -17,7 +17,6 @@ class Agent:
 
     def __init__(self, env : gym.Env, model_count=5):
         self.max_memory_size = 10000
-        self.episodes = 3000
         self.batch_size = 512 
 
         self.env = env
@@ -55,12 +54,13 @@ class Agent:
             uncertainty_penalty = delta_uncertainty.sum(-1) + reward_uncertainty.squeeze(-1)
 
             total_returns += rewards.squeeze(-1)
-            total_returns -= uncertainty_penalty
+            total_returns -= 25.0 * uncertainty_penalty  # Reduced uncertainty penalty
 
-            
-        #     print(f"Total Returns: {total_returns}")
-        #     print(f"Rewards: {rewards.squeeze(-1)}")
-        #     print(f"Delta Uncertainty: {delta_uncertainty.sum(-1)}")
+            # Debug prints for uncertainty analysis
+            # if t == 0:  # Only print first timestep to avoid spam
+            #     print(f"Average reward: {rewards.squeeze(-1).mean().item():.3f}")
+            #     print(f"Average uncertainty penalty: {uncertainty_penalty.mean().item():.3f}")
+            #     print(f"Net effect (reward - penalty): {(rewards.squeeze(-1) - uncertainty_penalty).mean().item():.3f}")
         # 
         best_idx = torch.argmax(total_returns)
         return action_sequences[best_idx, 0].cpu().numpy()
@@ -86,7 +86,7 @@ class Agent:
         print(f"Test Episode finished. Reward: {episode_reward}")
 
 
-    def train(self):
+    def train(self, episodes):
 
         total_steps = 0
         best_score = -1000
@@ -94,7 +94,7 @@ class Agent:
         summary_writer_name = f'runs/{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
         writer = SummaryWriter(summary_writer_name)
 
-        for episode in range(self.episodes):
+        for episode in range(episodes):
             done = False
             episode_reward = 0
             obs, info = self.env.reset()
@@ -114,23 +114,6 @@ class Agent:
                 if(done or truncated):
                     break
 
-                if(self.memory.can_sample(batch_size=self.batch_size)):
-                    states, actions, rewards, next_states, dones = self.memory.sample_buffer(batch_size=self.batch_size)
-                   
-                    # actions = actions.unsqueeze(1).long()
-                    rewards = rewards.unsqueeze(1)
-                    dones = dones.unsqueeze(1).float()
-
-#                    predicted_obs_diffs, predicated_rewards = self.model.predict(states, actions)
-
-                    loss = self.model.train_step(states=states,
-                                                 next_states=next_states,
-                                                 actions=actions,
-                                                 rewards=rewards)
-
-                    writer.add_scalar("Loss/model", loss, total_steps)
-
-                    total_steps += 1
 
             if(episode_reward > best_score):
                 best_score = episode_reward
@@ -140,4 +123,25 @@ class Agent:
             
             writer.add_scalar("Score/Episode Reward", episode_reward, episode)
             print(f"Episode {episode} finished. Reward: {episode_reward}")
+
+            
+            if(episode % 10 == 0):
+                for _ in range(100):
+                    if(self.memory.can_sample(batch_size=self.batch_size)):
+                        states, actions, rewards, next_states, dones = self.memory.sample_buffer(batch_size=self.batch_size)
+                       
+                        # actions = actions.unsqueeze(1).long()
+                        rewards = rewards.unsqueeze(1)
+                        dones = dones.unsqueeze(1).float()
+
+        #                    predicted_obs_diffs, predicated_rewards = self.model.predict(states, actions)
+
+                        loss = self.model.train_step(states=states,
+                                                     next_states=next_states,
+                                                     actions=actions,
+                                                     rewards=rewards)
+
+                        writer.add_scalar("Loss/model", loss, total_steps)
+
+                        total_steps += 1
 
